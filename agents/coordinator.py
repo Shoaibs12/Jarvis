@@ -1,99 +1,58 @@
 import google.generativeai as genai
 from config.gemini_key import GEMINI_API_KEY
+from modules.system_tools import open_application, open_website, chrome_search, control_volume, power_control, open_folder
+from modules.web_tools import web_search, fetch_latest_ai_news, summarize_url
+from database.memory_manager import MemoryManager
+from automation.screen_capture import analyze_screen
 
-from agents.task_classifier import TaskClassifier
-from agents.code_agent import CodeAgent
-from agents.web_agent import WebAgent
-from agents.system_agent import SystemAgent
-
-# Gemini LLM
+# Configure Gemini for Tool Use
 genai.configure(api_key=GEMINI_API_KEY)
-LLM = genai.GenerativeModel("models/gemini-2.5-flash")
-
-
-def safe_extract(response):
-    try:
-        if hasattr(response, "text") and response.text:
-            return response.text.strip()
-        if response.candidates:
-            parts = response.candidates[0].content.parts
-            if parts and hasattr(parts[0], "text"):
-                return parts[0].text.strip()
-    except:
-        pass
-    return "I'm not sure how to respond to that, sir."
-
 
 class CoordinatorAgent:
-
     def __init__(self):
-        self.classifier = TaskClassifier()
-        self.code = CodeAgent()
-        self.web = WebAgent()
-        self.system = SystemAgent()
+        self.memory = MemoryManager()
 
-    def handle(self, text: str):
+        # Tools available to the agent, including memory tools
+        self.tools = [
+            open_application,
+            open_website,
+            chrome_search,
+            control_volume,
+            power_control,
+            open_folder,
+            web_search,
+            fetch_latest_ai_news,
+            summarize_url,
+            self.memory.store_memory,
+            self.memory.retrieve_memory,
+            analyze_screen
+        ]
 
-        # 1. CLASSIFY USING GEMINI
-        task = self.classifier.classify(text)
-        lower = text.lower()
+        # Fetch initial context
+        context = self.memory.get_all_context()
 
-        # --------------------------
-        #   CODE TASKS  
-        # --------------------------
-        if task == "code_task":
-            if "explain" in lower:
-                return self.code.explain_code(text)
-            if "fix" in lower or "debug" in lower:
-                return "Please provide the code and the error message, sir."
+        system_prompt = (
+            "You are JARVIS, an advanced autonomous desktop AI assistant. "
+            "You have access to a variety of tools to control the system, navigate the web, fetch information, manage long-term memory, and even see the user's screen. "
+            "When asked to perform a task, use the appropriate tools. If multiple steps are required, plan them out and use the tools sequentially. "
+            "Always be polite, concise, and professional, like Iron Man's assistant.\n\n"
+            f"{context}"
+        )
 
-            return self.code.generate_code(text)
+        self.model = genai.GenerativeModel(
+            model_name="models/gemini-2.5-flash",
+            tools=self.tools,
+            system_instruction=system_prompt
+        )
+        self.chat = self.model.start_chat(enable_automatic_function_calling=True)
 
-        # --------------------------
-        #   WEB SEARCH
-        # --------------------------
-        if task == "web_search":
-            return self.web.search(text)
-
-        # --------------------------
-        #   SYSTEM CONTROL
-        # --------------------------
-        if task == "system_control":
-
-            # OPEN APP
-            if "open" in lower and ("chrome" in lower or "calculator" in lower or "vs code" in lower or "notepad" in lower):
-                return self.system.open_app(lower)
-
-            # OPEN WEBSITE
-            if "open" in lower or "website" in lower:
-                return self.system.open_website(lower)
-
-            # VOLUME
-            if "volume" in lower or "mute" in lower:
-                return self.system.control_volume(lower)
-
-            # BRIGHTNESS
-            if "brightness" in lower:
-                return self.system.set_brightness(lower)
-
-            # FOLDERS
-            if "folder" in lower or "downloads" in lower or "documents" in lower:
-                return self.system.open_folder(lower)
-
-            # SHUTDOWN / RESTART
-            if "shutdown" in lower:
-                return self.system.shutdown()
-            if "restart" in lower:
-                return self.system.restart()
-
-            return "System command detected, but I couldn't understand the exact action, sir."
-
-        # --------------------------
-        # GENERAL QUESTION → LLM
-        # --------------------------
+    def handle(self, user_input: str) -> str:
+        """
+        Processes user input by passing it to the Gemini chat session.
+        The `enable_automatic_function_calling=True` flag handles tool execution loops automatically.
+        """
         try:
-            response = LLM.generate_content(f"Answer clearly:\n{text}")
-            return safe_extract(response)
-
+            response = self.chat.send_message(user_input)
+            return response.text.strip()
         except Exception as e:
-            return f"Gemini Error: {str(e)}"
+            return f"I encountered an error while processing that request, sir: {str(e)}"
