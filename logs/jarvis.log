@@ -1,0 +1,24 @@
+[2026-05-15 16:52:15,439] [INFO] [main] [WARNING] Activation: DEV_MODE active. Bypassing Wake-Word.
+[2026-05-15 16:52:15,440] [INFO] [manual_engine] Manual Engine initialized. Pressing SPACE (mocked) or triggering via UI needed.
+[2026-05-15 16:52:15,440] [INFO] [main] [WARNING] TTS: TTS Disabled in config
+[2026-05-15 16:52:15,442] [INFO] [main] [WARNING] STT: STT Disabled in config
+[2026-05-15 16:52:15,453] [INFO] [main] [OK] Brain: Coordinator Agent Loaded
+[2026-05-15 16:52:15,453] [INFO] [main] [OK] Workflow: Workflow Engine Loaded
+[2026-05-15 16:52:15,453] [INFO] [manual_engine] Waiting for manual activation...
+[2026-05-15 16:52:18,454] [INFO] [tts] 🔊 (Muted) Jarvis: Yes sir, how can I help?
+[2026-05-15 16:52:18,754] [WARNING] [stt] STT Model not loaded. Returning empty string.
+[2026-05-15 16:52:18,756] [INFO] [tts] 🔊 (Muted) Jarvis: Entering standby mode, sir.
+[2026-05-15 16:52:18,756] [INFO] [manual_engine] Waiting for manual activation...
+[2026-05-15 17:03:59,658] [INFO] [main] [WARNING] Activation: DEV_MODE active. Bypassing Wake-Word.
+[2026-05-15 17:03:59,659] [INFO] [manual_engine] Manual Engine initialized. Pressing SPACE (mocked) or triggering via UI needed.
+[2026-05-15 17:03:59,660] [INFO] [main] [WARNING] TTS: TTS Disabled in config
+[2026-05-15 17:03:59,661] [INFO] [main] [WARNING] STT: STT Disabled in config
+[2026-05-15 17:03:59,662] [INFO] [main] [OK] Brain: Coordinator Agent Loaded
+[2026-05-15 17:03:59,662] [INFO] [main] [OK] Workflow: Workflow Engine Loaded
+[2026-05-15 17:03:59,662] [INFO] [manual_engine] Waiting for manual activation...
+[2026-05-15 17:04:02,663] [INFO] [tts] 🔊 (Muted) Jarvis: Yes sir, how can I help?
+[2026-05-15 17:04:02,964] [WARNING] [stt] STT Model not loaded. Returning empty string.
+[2026-05-15 17:04:03,965] [INFO] [manual_engine] Waiting for manual activation...
+[2026-05-15 17:04:04,673] [INFO] [tts] 🔊 (Muted) Jarvis: LibreChat API Error: HTTPConnectionPool(host='localhost', port=3080): Max retries exceeded with url: /api/v1/chat/completions (Caused by NewConnectionError("HTTPConnection(host='localhost', port=3080): Failed to establish a new connection: [Errno 111] Connection refused"))
+[2026-05-15 17:04:06,965] [INFO] [tts] 🔊 (Muted) Jarvis: Yes sir, how can I help?
+[2026-05-15 17:04:07,266] [WARNING] [stt] STT Model not loaded. Returning empty string.

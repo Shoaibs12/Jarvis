@@ -1,0 +1,13 @@
+PyQt6==6.11.0
+sounddevice==0.5.5
+numpy==2.4.4
+openai-whisper==20250625
+edge-tts==7.2.8
+duckduckgo-search==8.1.1
+beautifulsoup4==4.14.3
+pyautogui==0.9.54
+Pillow==12.2.0
+requests==2.34.1
+schedule==1.2.2
+openwakeword==0.4.0
+onnxruntime==1.26.0

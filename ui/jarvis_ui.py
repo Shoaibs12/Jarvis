@@ -1,8 +1,12 @@
-from PyQt6.QtWidgets import QWidget, QLabel, QTextEdit, QVBoxLayout, QHBoxLayout
-from PyQt6.QtGui import QMovie, QFont, QColor, QPalette
-from PyQt6.QtCore import Qt, QSize, QPropertyAnimation, QByteArray
+from PyQt6.QtWidgets import QWidget, QLabel, QTextEdit, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton
+from PyQt6.QtGui import QMovie, QFont
+from PyQt6.QtCore import Qt, QSize, QPropertyAnimation, pyqtSignal
 
 class JarvisUI(QWidget):
+    # Signals for UI-driven actions (manual activation, text chat)
+    manual_activation_triggered = pyqtSignal()
+    text_input_submitted = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
         self.init_ui()
@@ -13,7 +17,7 @@ class JarvisUI(QWidget):
     # --------------------------------------------------
     def init_ui(self):
         self.setWindowTitle("JARVIS AI OS")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 800, 650)
         self.setStyleSheet("background-color: #050510;")
 
         # Main Layout
@@ -66,12 +70,52 @@ class JarvisUI(QWidget):
         """)
         right_layout.addWidget(self.log_console)
 
+        # Bottom controls (Manual Activation & Text Mode Fallback)
+        bottom_controls = QHBoxLayout()
+
+        self.activate_btn = QPushButton("ACTIVATE")
+        self.activate_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #002244;
+                color: cyan;
+                border: 1px solid cyan;
+                border-radius: 5px;
+                padding: 8px;
+            }
+            QPushButton:hover { background-color: cyan; color: black; }
+        """)
+        self.activate_btn.clicked.connect(self._on_activate_clicked)
+        bottom_controls.addWidget(self.activate_btn)
+
+        self.text_input = QLineEdit()
+        self.text_input.setPlaceholderText("Type command here (Fallback Mode)...")
+        self.text_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #001122;
+                color: white;
+                border: 1px solid #0055ff;
+                border-radius: 5px;
+                padding: 8px;
+            }
+        """)
+        self.text_input.returnPressed.connect(self._on_text_submitted)
+        bottom_controls.addWidget(self.text_input)
+
+        right_layout.addLayout(bottom_controls)
+
         main_layout.addWidget(right_panel, stretch=2)
 
+    def _on_activate_clicked(self):
+        self.manual_activation_triggered.emit()
+
+    def _on_text_submitted(self):
+        text = self.text_input.text().strip()
+        if text:
+            self.text_input_submitted.emit(text)
+            self.text_input.clear()
+
     def append_log(self, text: str):
-        """Adds a line to the execution log safely."""
         self.log_console.append(text)
-        # Scroll to bottom
         scrollbar = self.log_console.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
@@ -88,21 +132,11 @@ class JarvisUI(QWidget):
     def set_status(self, text: str):
         self.status_label.setText(text)
         self.status_label.repaint()
-
-        # Fade-in animation
         self.anim.stop()
         self.status_label.setWindowOpacity(0.0)
         self.anim.setStartValue(0.0)
         self.anim.setEndValue(1.0)
         self.anim.start()
 
-    # Alias for compatibility (main.py uses both)
     def show_status(self, text: str):
         self.set_status(text)
-
-    # --------------------------------------------------
-    # UI-SIDE SPEAK DISPLAY (optional)
-    # --------------------------------------------------
-    def speak_text(self, text: str):
-        """Show what Jarvis is speaking in the UI"""
-        self.set_status(f"Jarvis: {text}")
