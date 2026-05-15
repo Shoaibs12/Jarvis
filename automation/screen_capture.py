@@ -1,39 +1,37 @@
 import pyautogui
 from PIL import Image
 import io
-import google.generativeai as genai
-from config.gemini_key import GEMINI_API_KEY
-
-genai.configure(api_key=GEMINI_API_KEY)
-VISION_MODEL = genai.GenerativeModel("models/gemini-2.5-flash")
+import base64
+from ai.librechat_client import LibreChatClient
 
 def analyze_screen(prompt: str = "Describe what is on my screen in detail.") -> str:
     """
-    Takes a screenshot of the user's desktop and asks the Gemini vision model to analyze it.
-    Use this tool when the user asks "what is on my screen" or asks to read/see something visible.
-
-    Args:
-        prompt: The specific question or instruction regarding the screenshot content.
+    Takes a screenshot of the user's desktop and asks the LibreChat vision model to analyze it.
     """
     try:
-        # Capture screen
         screenshot = pyautogui.screenshot()
 
-        # Save to bytes
         img_byte_arr = io.BytesIO()
         screenshot.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
+        img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
 
-        image_parts = [
+        messages = [
             {
-                "mime_type": "image/png",
-                "data": img_byte_arr
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{img_base64}"
+                        }
+                    }
+                ]
             }
         ]
 
-        response = VISION_MODEL.generate_content([prompt, image_parts[0]])
-        if hasattr(response, "text") and response.text:
-            return response.text.strip()
-        return "I could not extract meaningful text or description from the screen."
+        client = LibreChatClient()
+        response = client.chat_completion(messages, model="gpt-4o")
+        return response.strip()
     except Exception as e:
         return f"Failed to capture or analyze screen: {str(e)}"
