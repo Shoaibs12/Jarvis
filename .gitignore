@@ -8,3 +8,5 @@ venv/
 .venv/
 venv*/
 *.db
+node_modules/
+database/chroma_db/

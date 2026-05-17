@@ -1,19 +1,33 @@
 import sounddevice as sd
 import numpy as np
 import whisper
+from core.logger import get_logger
+
+logger = get_logger("STT")
 
 class SpeechToText:
     def __init__(self):
-        print("🔁 Loading Whisper model (small)...")
-        self.model = whisper.load_model("small")
-        print("✅ Whisper loaded")
-
+        self.model = None
         self.sr = 16000
         self.silence_threshold = 0.015
         self.max_seconds = 20
 
+    def start(self):
+        try:
+            logger.info("🔁 Loading Whisper model (small)...")
+            self.model = whisper.load_model("small")
+            logger.info("✅ Whisper loaded")
+        except Exception as e:
+            logger.error(f"❌ Failed to load Whisper: {e}")
+            self.model = None
+
     def listen(self):
+        if not self.model:
+            logger.warning("STT Model not loaded. Returning empty string.")
+            return ""
+
         print("🎤 Listening... Speak now.")
+        logger.info("Listening for speech...")
 
         frames = []
         silent_chunks = 0
@@ -38,11 +52,10 @@ class SpeechToText:
                         if has_spoken:
                             silent_chunks += 1
 
-                    # Stop if we heard speech and then 2 seconds of silence
                     if has_spoken and silent_chunks > 6:
                         break
         except Exception as e:
-            print("❌ Microphone Error in STT:", e)
+            logger.error(f"❌ Microphone Error in STT: {e}")
             return ""
 
         if not frames:
@@ -50,14 +63,13 @@ class SpeechToText:
 
         audio_np = np.concatenate(frames, axis=0)
 
-        # Check if the overall audio has enough volume to be considered speech
         if np.abs(audio_np).mean() < self.silence_threshold * 0.5:
             return ""
 
-        print("🎧 Transcribing with Whisper...")
+        logger.info("🎧 Transcribing with Whisper...")
         try:
             result = self.model.transcribe(audio_np, fp16=False)
             return result.get("text", "").strip()
         except Exception as e:
-            print("❌ Whisper Error:", e)
+            logger.error(f"❌ Whisper Transcription Error: {e}")
             return ""
