@@ -22,3 +22,21 @@
 [2026-05-15 17:04:04,673] [INFO] [tts] 🔊 (Muted) Jarvis: LibreChat API Error: HTTPConnectionPool(host='localhost', port=3080): Max retries exceeded with url: /api/v1/chat/completions (Caused by NewConnectionError("HTTPConnection(host='localhost', port=3080): Failed to establish a new connection: [Errno 111] Connection refused"))
 [2026-05-15 17:04:06,965] [INFO] [tts] 🔊 (Muted) Jarvis: Yes sir, how can I help?
 [2026-05-15 17:04:07,266] [WARNING] [stt] STT Model not loaded. Returning empty string.
+[2026-05-17 07:25:33,951] [INFO] [memory_manager] ChromaDB MemoryManager initialized.
+[2026-05-17 07:43:14,271] [INFO] [memory_manager] ChromaDB MemoryManager initialized.
+[2026-05-17 07:50:37,167] [INFO] [main] [WARNING] NodeBackend: Failed to connect to Node.js server: HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: /socket.io/?transport=polling&EIO=4&t=1779004237.148784 (Caused by NewConnectionError("HTTPConnection(host='localhost', port=3000): Failed to establish a new connection: [Errno 111] Connection refused"))
+[2026-05-17 07:50:37,167] [INFO] [main] [WARNING] Activation: DEV_MODE active. Bypassing Wake-Word.
+[2026-05-17 07:50:37,167] [INFO] [manual_engine] Manual Engine initialized. Pressing SPACE (mocked) or triggering via UI needed.
+[2026-05-17 07:50:37,168] [INFO] [main] [WARNING] TTS: TTS Disabled in config
+[2026-05-17 07:50:37,168] [INFO] [main] [WARNING] STT: STT Disabled in config
+[2026-05-17 07:50:37,325] [INFO] [memory_manager] ChromaDB MemoryManager initialized.
+[2026-05-17 07:50:37,338] [INFO] [main] [OK] Brain: Coordinator Agent Loaded
+[2026-05-17 07:50:37,338] [INFO] [main] [OK] Workflow: Workflow Engine Loaded
+[2026-05-17 07:50:37,339] [INFO] [manual_engine] Waiting for manual activation...
+[2026-05-17 07:50:40,339] [INFO] [tts] 🔊 (Muted) Jarvis: Yes sir, how can I help?
+[2026-05-17 07:50:40,670] [WARNING] [stt] STT Model not loaded. Returning empty string.
+[2026-05-17 07:50:41,671] [INFO] [manual_engine] Waiting for manual activation...
+[2026-05-17 07:50:44,672] [INFO] [tts] 🔊 (Muted) Jarvis: Yes sir, how can I help?
+[2026-05-17 07:50:44,972] [WARNING] [stt] STT Model not loaded. Returning empty string.
+[2026-05-17 07:50:46,011] [INFO] [manual_engine] Waiting for manual activation...
+[2026-05-17 07:50:49,012] [INFO] [tts] 🔊 (Muted) Jarvis: Yes sir, how can I help?

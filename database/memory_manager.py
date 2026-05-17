@@ -1,80 +1,97 @@
-import sqlite3
+import chromadb
 import os
+import uuid
+import datetime
+from core.logger import get_logger
+
+logger = get_logger("MemoryManager")
 
 class MemoryManager:
-    def __init__(self, db_path="database/jarvis_memory.db"):
+    def __init__(self, db_path="database/chroma_db"):
         self.db_path = db_path
-        self._init_db()
-
-    def _init_db(self):
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS memory (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    topic TEXT NOT NULL,
-                    information TEXT NOT NULL,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            conn.commit()
+        os.makedirs(self.db_path, exist_ok=True)
+        try:
+            self.client = chromadb.PersistentClient(path=self.db_path)
+            # Create or get the collection
+            self.collection = self.client.get_or_create_collection(
+                name="jarvis_memory",
+                metadata={"hnsw:space": "cosine"} # Default L2, cosine is fine for semantic
+            )
+            logger.info("ChromaDB MemoryManager initialized.")
+        except Exception as e:
+            logger.error(f"Failed to initialize ChromaDB: {e}")
+            self.client = None
+            self.collection = None
 
     def store_memory(self, topic: str, information: str) -> str:
         """
-        Stores important user preferences, habits, or context for long-term memory.
-
-        Args:
-            topic: The category or subject of the memory (e.g., 'user_name', 'favorite_ide').
-            information: The detail to remember.
+        Stores important user preferences, habits, or context as a semantic vector in ChromaDB.
         """
+        if not self.collection:
+            return "Memory storage is offline."
+
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO memory (topic, information) VALUES (?, ?)",
-                    (topic, information)
-                )
-                conn.commit()
+            mem_id = str(uuid.uuid4())
+            timestamp = datetime.datetime.now().isoformat()
+
+            # For ChromaDB, we embed the information (or a combination of topic and information)
+            # ChromaDB uses a default all-MiniLM-L6-v2 embedding model automatically if none provided.
+            self.collection.add(
+                documents=[information],
+                metadatas=[{"topic": topic, "timestamp": timestamp}],
+                ids=[mem_id]
+            )
+            logger.info(f"Stored memory: [{topic}] {information}")
             return f"Successfully stored memory under topic '{topic}'."
         except Exception as e:
+            logger.error(f"Failed to store memory: {e}")
             return f"Failed to store memory: {e}"
 
     def retrieve_memory(self, topic: str) -> str:
         """
-        Retrieves long-term memory information regarding a specific topic.
-
-        Args:
-            topic: The category or subject of the memory to fetch.
+        Retrieves long-term memory information regarding a specific topic using semantic search.
         """
+        if not self.collection:
+            return "Memory retrieval is offline."
+
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT information FROM memory WHERE topic LIKE ? ORDER BY timestamp DESC",
-                    (f"%{topic}%",)
-                )
-                results = cursor.fetchall()
-                if results:
-                    return "\n".join([r[0] for r in results])
-                return "No memory found for that topic."
+            # Semantic search querying the topic
+            results = self.collection.query(
+                query_texts=[topic],
+                n_results=3
+            )
+
+            if results and results['documents'] and results['documents'][0]:
+                retrieved_docs = results['documents'][0]
+                return "\n".join(retrieved_docs)
+
+            return "No memory found for that topic."
         except Exception as e:
+            logger.error(f"Failed to retrieve memory: {e}")
             return f"Failed to retrieve memory: {e}"
 
     def get_all_context(self) -> str:
         """
-        Fetches a summary of all recent memories to inject into the system prompt.
+        Fetches recent memories to inject into the system prompt.
         """
+        if not self.collection:
+            return "No prior context available."
+
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT topic, information FROM memory ORDER BY timestamp DESC LIMIT 20")
-                results = cursor.fetchall()
-                if not results:
-                    return "No prior context available."
-                context = "Relevant User Context/Memory:\n"
-                for topic, info in results:
-                    context += f"- {topic}: {info}\n"
-                return context
+            # ChromaDB currently doesn't easily support "fetch all ordered by time" via basic query without custom metadata filtering.
+            # As a fallback, we fetch the most recent items.
+            results = self.collection.get(
+                limit=10
+            )
+
+            if not results or not results['documents']:
+                return "No prior context available."
+
+            context = "Relevant User Context/Memory:\n"
+            for doc, meta in zip(results['documents'], results['metadatas']):
+                topic = meta.get("topic", "General")
+                context += f"- {topic}: {doc}\n"
+            return context
         except Exception as e:
+            logger.error(f"Failed to get context: {e}")
             return ""

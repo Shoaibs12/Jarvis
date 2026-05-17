@@ -13,27 +13,24 @@ from audio.tts import TextToSpeech
 from agents.coordinator import CoordinatorAgent
 from ui.jarvis_ui import JarvisUI
 from automation.workflow_engine import engine as workflow_engine
+import socketio
 
 logger = get_logger("SystemManager")
 
-# ------------------------------------------------
-# SIGNAL COMMUNICATOR
-# ------------------------------------------------
 class Communicator(QObject):
     update_status = pyqtSignal(str)
     append_log = pyqtSignal(str)
 
-# ------------------------------------------------
-# SERVICE LOADER & MANAGER
-# ------------------------------------------------
 class SystemManager:
-    """Handles the safe initialization of all Jarvis modules."""
     def __init__(self, comm):
         self.comm = comm
         self.activation = None
         self.stt = None
         self.tts = None
         self.brain = None
+
+        self.sio = socketio.Client()
+        self.node_connected = False
 
     def log_status(self, component, status, message):
         tag = "[OK]" if status else "[WARNING]"
@@ -43,8 +40,16 @@ class SystemManager:
         self.comm.append_log.emit(log_line)
 
     def boot(self):
-        """Starts all subsystems with graceful fallbacks."""
         self.comm.append_log.emit("\n[SYSTEM] Boot Sequence Initiated...")
+
+        # Connect to Node.js backend
+        try:
+            self.sio.connect('http://localhost:3000')
+            self.node_connected = True
+            self.log_status("NodeBackend", True, "Connected to Node.js Realtime Orchestration Server")
+            self.sio.emit('agent_event', {'type': 'system_status', 'message': 'Booting...'})
+        except Exception as e:
+            self.log_status("NodeBackend", False, f"Failed to connect to Node.js server: {e}")
 
         # 1. Activation Engine
         if features.DEV_MODE:
@@ -104,22 +109,17 @@ class SystemManager:
 
         self.comm.append_log.emit("[SYSTEM] Boot Sequence Complete.\n")
 
-# ------------------------------------------------
-# MAIN JARVIS ENGINE (Daemon Worker)
-# ------------------------------------------------
 class JarvisEngine:
     def __init__(self, comm, ui):
         self.comm = comm
         self.ui = ui
         self.manager = SystemManager(comm)
 
-        # UI Hooks for manual triggers & text input
         self.ui.manual_activation_triggered.connect(self.trigger_manual_activation)
         self.ui.text_input_submitted.connect(self.handle_text_input)
 
         self.manual_trigger_flag = False
 
-        # Background thread
         thread = threading.Thread(target=self.core_loop)
         thread.daemon = True
         thread.start()
@@ -129,51 +129,53 @@ class JarvisEngine:
 
     def log_ui(self, text):
         self.comm.append_log.emit(text)
+        if self.manager.node_connected:
+             self.manager.sio.emit('agent_event', {'type': 'log', 'message': text})
 
     def trigger_manual_activation(self):
-        """Called by the UI Activate button."""
         self.manual_trigger_flag = True
 
     def handle_text_input(self, text):
-        """Called by the UI text input box, bypassing voice STT entirely."""
-        self.log_ui(f"\n[USER_TEXT] {text}")
-        if self.manager.brain:
-            self.update_ui("Thinking...")
-            reply = self.manager.brain.handle(text)
-            self.update_ui(f"Jarvis: {reply}")
-            self.log_ui(f"[JARVIS] {reply}")
-            self.manager.tts.speak(reply)
-        else:
-            self.log_ui("[ERROR] Brain offline.")
+        # Run text processing in a background thread to prevent UI freezing
+        def process():
+            self.log_ui(f"\n[USER_TEXT] {text}")
+            if self.manager.brain:
+                self.update_ui("Thinking...")
+                if self.manager.node_connected:
+                     self.manager.sio.emit('agent_event', {'type': 'status', 'state': 'THINKING'})
+                reply = self.manager.brain.handle(text)
+                self.update_ui(f"Jarvis: {reply}")
+                self.log_ui(f"[JARVIS] {reply}")
+                self.manager.tts.speak(reply)
+                if self.manager.node_connected:
+                     self.manager.sio.emit('agent_event', {'type': 'status', 'state': 'IDLE'})
+            else:
+                self.log_ui("[ERROR] Brain offline.")
+
+        threading.Thread(target=process, daemon=True).start()
 
     def process_voice_input(self):
-        """Inner continuous listening loop."""
         listening_active = True
         while listening_active:
             self.update_ui("Listening...")
-            print("🎤 Listening... Speak now.")
+            if self.manager.node_connected:
+                 self.manager.sio.emit('agent_event', {'type': 'status', 'state': 'LISTENING'})
 
-            # Use STT. If it fails or is disabled, it will return "" fast.
-            # We break instead of continuing immediately to prevent CPU loop pegging
             user_text = self.manager.stt.listen()
 
             if not user_text.strip():
                 if features.DEV_MODE or not features.ENABLE_STT or self.manager.stt.model is None:
-                    # Prevent infinite busy loop if hardware is missing
                     time.sleep(1)
                     break
                 else:
                     continue
 
-            print("🗣 You said:", user_text)
             self.update_ui(f"You: {user_text}")
             self.log_ui(f"\n[USER_VOICE] {user_text}")
 
             lower_text = user_text.lower()
-
             if "sleep" in lower_text or "stop listening" in lower_text:
                 reply = "Entering standby mode, sir."
-                print("🔈 Jarvis:", reply)
                 self.update_ui(f"Jarvis: {reply}")
                 self.log_ui(f"[SYS] {reply}")
                 self.manager.tts.speak(reply)
@@ -182,16 +184,16 @@ class JarvisEngine:
 
             if self.manager.brain:
                 self.update_ui("Thinking...")
+                if self.manager.node_connected:
+                     self.manager.sio.emit('agent_event', {'type': 'status', 'state': 'THINKING'})
                 self.log_ui("[REASONING] Invoking autonomous tool routing...")
                 reply = self.manager.brain.handle(user_text)
             else:
                 reply = "My core reasoning engine is offline. I cannot process that."
 
-            print("🔈 Jarvis:", reply)
             self.update_ui(f"Jarvis: {reply}")
             self.log_ui(f"[JARVIS] {reply}")
             self.manager.tts.speak(reply)
-
             time.sleep(0.5)
 
     def core_loop(self):
@@ -199,8 +201,9 @@ class JarvisEngine:
 
         while True:
             self.update_ui("Awaiting Activation...")
+            if self.manager.node_connected:
+                 self.manager.sio.emit('agent_event', {'type': 'status', 'state': 'STANDBY'})
 
-            # Check for manual UI click
             if self.manual_trigger_flag:
                 self.manual_trigger_flag = False
                 trigger = "ui_button"
@@ -209,30 +212,28 @@ class JarvisEngine:
                     self.log_ui("\n[DEV_MODE] Auto-triggering activation in 3 seconds...")
                     trigger = self.manager.activation.listen()
                 else:
+                    # In real mode, use non-blocking check if possible, or short timeout
+                    # OpenWakeWord doesn't have a non-blocking mode easily exposed without threading it ourselves.
+                    # As a simple fix, we will check the manual flag *inside* the listen loop in the engine,
+                    # or run listen() in a thread. Since modifying OWW is risky, we will use a small sleep
+                    # or rely on the UI override which we'll process in text_input (which works fine async).
+                    # A robust fix requires moving OWW into a separate thread, but for now we poll.
                     trigger = self.manager.activation.listen()
-
-                    # If hardware fails inside listen(), it might return None quickly. Prevent loop pegging.
                     if trigger is None:
-                        time.sleep(1)
+                        time.sleep(0.5)
 
             if not trigger:
                 continue
 
             self.update_ui("Activated. Listening...")
             self.log_ui(f"[SYS] Activation triggered via {trigger}.")
-            print("🔈 Jarvis: Yes sir, how can I help?")
             self.manager.tts.speak("Yes sir, how can I help?")
             time.sleep(0.3)
 
-            # Enter continuous mode
             self.process_voice_input()
 
-# ------------------------------------------------
-# APP ENTRY
-# ------------------------------------------------
 def main():
     app = QApplication(sys.argv)
-
     ui = JarvisUI()
     ui.show()
 
@@ -241,7 +242,6 @@ def main():
     comm.append_log.connect(ui.append_log)
 
     engine = JarvisEngine(comm, ui)
-
     sys.exit(app.exec())
 
 if __name__ == "__main__":
